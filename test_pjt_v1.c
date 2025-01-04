@@ -69,56 +69,39 @@ uint32_t map_adc_to_freq(uint16_t adc_value,uint16_t max,uint16_t min) {
 
 }
 
-void setfreq_timer0(uint32_t freq) {
-    uint16_t ocr;
 
-    // Calculate OCR0A value
-    ocr = (uint16_t)((F_CPU / (2UL * freq)) - 1);
 
-    // Configure Timer0 in CTC mode (Mode 2)
-    TCCR0A = (1 << WGM01) | (1 << COM0B0); // CTC mode, Toggle OC0B on compare match
-    TCCR0B = (1 << CS00);                  // No prescaling (prescaler = 1)
-
-    OCR0A = ocr; // Set TOP value for desired frequency
-}
-
-void setfreq_timer1_ad(uint32_t freq) {
+void set_pwm_freq(uint32_t freq) {
+    uint16_t prescaler_bits = 0;
     uint16_t prescaler = 1;
-    uint16_t ocr;
-    uint8_t prescaler_bits = 0;
 
-    // Select the appropriate prescaler
-    if (freq >= 122) {          // Prescaler 1
-        prescaler = 1;
-        prescaler_bits = (1 << CS10);
-    } else if (freq >= 15) {    // Prescaler 8
-        prescaler = 8;
-        prescaler_bits = (1 << CS11);
-    } else if (freq >= 2) {     // Prescaler 64
-        prescaler = 64;
-        prescaler_bits = (1 << CS11) | (1 << CS10);
-    } else if (freq >= 1) {     // Prescaler 256
-        prescaler = 256;
-        prescaler_bits = (1 << CS12);
-    } else {                    // Prescaler 1024
-        prescaler = 1024;
-        prescaler_bits = (1 << CS12) | (1 << CS10);
-    }
+//    // Select appropriate prescaler
+//    if (freq >= 20000) {  // Prescaler 1
+//        prescaler = 1;
+//        prescaler_bits = (1 << CS10);
+//    } else if (freq >= 3125) {  // Prescaler 8
+//        prescaler = 8;
+//        prescaler_bits = (1 << CS11);
+//    } else if (freq >= 390) {  // Prescaler 64
+//        prescaler = 64;
+//        prescaler_bits = (1 << CS11) | (1 << CS10);
+//    } else if (freq >= 98) {  // Prescaler 256
+//        prescaler = 256;
+//        prescaler_bits = (1 << CS12);
+//    } else {  // Prescaler 1024
+//        prescaler = 1024;
+//        prescaler_bits = (1 << CS12) | (1 << CS10);
+//    }
 
-    // Calculate OCR1A
-    ocr = (uint16_t)((F_CPU / (2UL * prescaler * freq)) - 1);
+    // Calculate ICR1
+    uint16_t icr = (uint16_t)((F_CPU / (freq * prescaler)) - 1);
 
-    // Ensure OCR1A fits in 16-bit range
-    if (ocr > 65535) {
-        return; // Frequency too low
-    }
-
-     TCCR1A = (1 << COM1B0); 
-     TCCR1B = (1 << WGM12) | prescaler_bits; // CTC mode with selected prescaler
-     OCR1A = ocr; // Set TOP value for the desired frequency
-     OCR1B = ocr; // Set compare value for toggling OC1B
+    // Configure Timer1 for Fast PWM mode
+    TCCR1A = (1 << WGM11)|(1 << COM1B1)|(1 << COM1B0);                // Fast PWM mode, non-inverted
+    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10);
+    ICR1 = icr;                           // Set TOP value for desired frequency
+    OCR1B =(uint16_t) icr *.5;                      // 50% duty cycle
 }
-
  
 int main(void) {
     uint16_t  eeprom_address_MIN = 1;  
@@ -159,7 +142,7 @@ int main(void) {
 //    ADCSRB=0x20;
 //        
     // ADC Initialization with external opam
-    ADMUX = 0xC0;  
+    ADMUX = 0xC2;  
     ADCSRA = 0x87; // Enable ADC and set prescaler to 128 
     ADCSRB=0x20;
     
@@ -203,19 +186,19 @@ int main(void) {
 
         // Set frequency
         
-       setfreq_timer1_ad(freq);
+       set_pwm_freq(freq);
         
         
         // Send ADC and frequency via UART
 //       
-        cmd(0x80);
-        sprintf(buffer, "ADC=% 4u F% 5lu Hz", a, freq);
-        display(buffer);
-        cmd(0xC0);
-        sprintf(buffer, "max% 4u min% 4u",max_val,min_val);
-        display(buffer);  
-//      
-   //    _delay_ms(50);
+//        cmd(0x80);
+//        sprintf(buffer, "ADC=% 4u F% 5lu Hz", a, freq);
+//        display(buffer);
+//        cmd(0xC0);
+//        sprintf(buffer, "max% 4u min% 4u",max_val,min_val);
+//        display(buffer);  
+////      
+       _delay_ms(10);
        
   
    
